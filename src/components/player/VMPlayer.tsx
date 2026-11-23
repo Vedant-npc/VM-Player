@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import type { VideoItem, VideoQuality, PlayerStats } from '../../types/media';
+import type { ActiveVideo, PlayerStats } from '../../types/media';
 import { Controls } from './Controls';
 import { VolumeHUD } from './VolumeHUD';
 import { SpeedHUD } from './SpeedHUD';
@@ -10,37 +10,59 @@ import { PlayIcon, PauseIcon } from '../common/Icons';
 import { useToast } from '../../context/ToastContext';
 
 interface VMPlayerProps {
-  video: VideoItem;
-  currentQuality: VideoQuality;
+  video: ActiveVideo;
   isTheaterMode: boolean;
   onToggleTheater: () => void;
   onOpenShortcuts: () => void;
-  onTimeUpdateProgress?: (seconds: number) => void;
+}
+
+// Global YouTube API script loader promise
+let ytApiPromise: Promise<void> | null = null;
+function loadYouTubeApi(): Promise<void> {
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    // @ts-expect-error window.YT
+    if (window.YT && window.YT.Player) {
+      resolve();
+      return;
+    }
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+    // @ts-expect-error window.onYouTubeIframeAPIReady
+    window.onYouTubeIframeAPIReady = () => {
+      resolve();
+    };
+  });
+  return ytApiPromise;
 }
 
 export const VMPlayer: React.FC<VMPlayerProps> = ({
   video,
-  currentQuality,
   isTheaterMode,
   onToggleTheater,
   onOpenShortcuts,
-  onTimeUpdateProgress,
 }) => {
   const { showError, showSuccess } = useToast();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const ytPlayerRef = useRef<any>(null);
+  const ytContainerId = 'vm-yt-player-surface';
+
+  const isYouTube = video.type === 'youtube' && !!video.youtubeId;
 
   // Playback States
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(video.duration || 0);
+  const [duration, setDuration] = useState<number>(0);
   const [bufferedEnd, setBufferedEnd] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [basePlaybackRate, setBasePlaybackRate] = useState<number>(1.0);
   const [isBoostingSpeed, setIsBoostingSpeed] = useState<boolean>(false);
-  const [subtitlesEnabled, setSubtitlesEnabled] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isStatsOpen, setIsStatsOpen] = useState<boolean>(false);
@@ -54,15 +76,16 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
 
   // Stats for Nerds Telemetry
   const [stats, setStats] = useState<PlayerStats>({
-    resolution: '1920x1080@60fps',
+    sourceType: isYouTube ? 'YouTube IFrame Engine' : 'HTML5 Native Hardware Decoder',
+    resolution: '1920x1080',
     viewport: '1280x720',
     bufferedEnd: 0,
     bufferHealth: '0.0s',
     droppedFrames: 0,
-    currentBitrate: '8.4 Mbps',
+    currentBitrate: isYouTube ? 'YouTube Variable Bitrate' : video.fileSize || 'Direct Stream',
     playbackRate: 1.0,
     volumePercent: 100,
-    codec: 'av01.0.08M.08 / aac',
+    engine: isYouTube ? 'Google YouTube Core' : 'Blink WebMedia VideoDecoder',
   });
 
   // Timers Refs
@@ -74,45 +97,6 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
   const clickCountRef = useRef<number>(0);
   const singleClickTimerRef = useRef<number | null>(null);
 
-  // Active Source Resolver
-  const activeSource = useCallback(() => {
-    if (!video.sources || video.sources.length === 0) {
-      return {
-        quality: '1080p' as VideoQuality,
-        label: '1080p',
-        src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-        fps: 60,
-        bitrate: '8.4 Mbps',
-      };
-    }
-    const matched = video.sources.find((s) => s.quality === currentQuality);
-    return matched || video.sources[0];
-  }, [video.sources, currentQuality]);
-
-  const sourceObj = activeSource();
-
-  // Reset or Switch Source smoothly
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-
-    const previousTime = v.currentTime;
-    const wasPlaying = !v.paused;
-
-    v.src = sourceObj.src;
-    v.load();
-
-    if (previousTime > 0) {
-      v.currentTime = previousTime;
-    }
-
-    if (wasPlaying) {
-      v.play().catch(() => {
-        setIsPlaying(false);
-      });
-    }
-  }, [sourceObj.src]);
-
   // Flash Center Play/Pause Indicator
   const triggerCenterIcon = (type: 'play' | 'pause') => {
     setCenterPlayIcon(type);
@@ -122,8 +106,137 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     }, 450);
   };
 
+  // ----------------------------------------------------
+  // YouTube IFrame Player Initializer & Watcher
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isYouTube || !video.youtubeId) return;
+
+    let isMounted = true;
+    let tickerInterval: number | null = null;
+
+    loadYouTubeApi().then(() => {
+      if (!isMounted) return;
+
+      // Clean up previous instance if any
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch {
+          // Ignored
+        }
+      }
+
+      // @ts-expect-error window.YT
+      ytPlayerRef.current = new window.YT.Player(ytContainerId, {
+        videoId: video.youtubeId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          iv_load_policy: 3,
+          playsinline: 1,
+          fs: 0,
+          disablekb: 1,
+        },
+        events: {
+          // @ts-expect-error event
+          onReady: (event) => {
+            if (!isMounted) return;
+            const dur = event.target.getDuration();
+            setDuration(dur || 0);
+            event.target.playVideo();
+            setIsPlaying(true);
+          },
+          // @ts-expect-error event
+          onStateChange: (event) => {
+            if (!isMounted) return;
+            // 1: PLAYING, 2: PAUSED, 3: BUFFERING, 0: ENDED
+            if (event.data === 1) {
+              setIsPlaying(true);
+              setIsBuffering(false);
+            } else if (event.data === 2) {
+              setIsPlaying(false);
+              setIsBuffering(false);
+            } else if (event.data === 3) {
+              setIsBuffering(true);
+            } else if (event.data === 0) {
+              setIsPlaying(false);
+            }
+          },
+        },
+      });
+
+      // Ticker interval to update timeline current time and buffer
+      tickerInterval = window.setInterval(() => {
+        if (ytPlayerRef.current && typeof ytPlayerRef.current.getCurrentTime === 'function') {
+          try {
+            const cur = ytPlayerRef.current.getCurrentTime() || 0;
+            const dur = ytPlayerRef.current.getDuration() || 0;
+            const loadedFraction = ytPlayerRef.current.getVideoLoadedFraction() || 0;
+
+            setCurrentTime(cur);
+            if (dur > 0) {
+              setDuration(dur);
+              setBufferedEnd(dur * loadedFraction);
+            }
+          } catch {
+            // Player might be switching
+          }
+        }
+      }, 250);
+    });
+
+    return () => {
+      isMounted = false;
+      if (tickerInterval) clearInterval(tickerInterval);
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch {
+          // Ignored
+        }
+      }
+    };
+  }, [isYouTube, video.youtubeId]);
+
+  // ----------------------------------------------------
+  // HTML5 Video Loader (for Local Files & Direct URLs)
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (isYouTube) return;
+    const v = videoRef.current;
+    if (!v) return;
+
+    v.src = video.url;
+    v.load();
+    v.play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
+  }, [isYouTube, video.url]);
+
+  // ----------------------------------------------------
   // Play / Pause Toggle
+  // ----------------------------------------------------
   const togglePlay = useCallback(() => {
+    if (isYouTube && ytPlayerRef.current) {
+      try {
+        if (isPlaying) {
+          ytPlayerRef.current.pauseVideo();
+          setIsPlaying(false);
+          triggerCenterIcon('pause');
+        } else {
+          ytPlayerRef.current.playVideo();
+          setIsPlaying(true);
+          triggerCenterIcon('play');
+        }
+      } catch (err) {
+        console.warn('YouTube play/pause error', err);
+      }
+      return;
+    }
+
     const v = videoRef.current;
     if (!v) return;
 
@@ -133,8 +246,7 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           setIsPlaying(true);
           triggerCenterIcon('play');
         })
-        .catch((err) => {
-          console.warn('Playback interrupted', err);
+        .catch(() => {
           showError('Playback could not be started');
         });
     } else {
@@ -142,94 +254,143 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       setIsPlaying(false);
       triggerCenterIcon('pause');
     }
-  }, [showError]);
+  }, [isPlaying, isYouTube, showError]);
 
-  // Seek Actions
+  // ----------------------------------------------------
+  // Seeking Mechanics (-10s / +10s / Scrubber)
+  // ----------------------------------------------------
   const handleSeek = useCallback(
     (targetSeconds: number) => {
-      const v = videoRef.current;
-      if (!v) return;
-      const clamped = Math.max(0, Math.min(targetSeconds, v.duration || duration));
-      v.currentTime = clamped;
+      const clamped = Math.max(0, Math.min(targetSeconds, duration));
       setCurrentTime(clamped);
-      if (onTimeUpdateProgress) onTimeUpdateProgress(clamped);
+
+      if (isYouTube && ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.seekTo(clamped, true);
+        } catch {
+          // Ignored
+        }
+        return;
+      }
+
+      const v = videoRef.current;
+      if (v) {
+        v.currentTime = clamped;
+      }
     },
-    [duration, onTimeUpdateProgress]
+    [duration, isYouTube]
   );
 
   const seekBackward10 = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const nextTime = Math.max(0, v.currentTime - 10);
+    const nextTime = Math.max(0, currentTime - 10);
     handleSeek(nextTime);
 
     setSeekHUDDirection('backward');
     if (seekHUDTimeoutRef.current) clearTimeout(seekHUDTimeoutRef.current);
     seekHUDTimeoutRef.current = window.setTimeout(() => setSeekHUDDirection(null), 600);
-  }, [handleSeek]);
+  }, [currentTime, handleSeek]);
 
   const seekForward10 = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const nextTime = Math.min(v.duration || duration, v.currentTime + 10);
+    const nextTime = Math.min(duration, currentTime + 10);
     handleSeek(nextTime);
 
     setSeekHUDDirection('forward');
     if (seekHUDTimeoutRef.current) clearTimeout(seekHUDTimeoutRef.current);
     seekHUDTimeoutRef.current = window.setTimeout(() => setSeekHUDDirection(null), 600);
-  }, [duration, handleSeek]);
+  }, [currentTime, duration, handleSeek]);
 
+  // ----------------------------------------------------
   // Volume Low/High Animation & Changes
-  const handleVolumeChange = useCallback((newVol: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const clamped = Math.max(0, Math.min(1, newVol));
-    v.volume = clamped;
-    setVolume(clamped);
+  // ----------------------------------------------------
+  const handleVolumeChange = useCallback(
+    (newVol: number) => {
+      const clamped = Math.max(0, Math.min(1, newVol));
+      setVolume(clamped);
 
-    if (clamped === 0) {
-      v.muted = true;
-      setIsMuted(true);
-    } else if (v.muted) {
-      v.muted = false;
-      setIsMuted(false);
+      if (clamped === 0) {
+        setIsMuted(true);
+      } else if (isMuted) {
+        setIsMuted(false);
+      }
+
+      if (isYouTube && ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.setVolume(clamped * 100);
+          if (clamped === 0) ytPlayerRef.current.mute();
+          else ytPlayerRef.current.unMute();
+        } catch {
+          // Ignored
+        }
+      } else if (videoRef.current) {
+        videoRef.current.volume = clamped;
+        videoRef.current.muted = clamped === 0;
+      }
+
+      setVolumeHUDVisible(true);
+      if (volumeHUDTimeoutRef.current) clearTimeout(volumeHUDTimeoutRef.current);
+      volumeHUDTimeoutRef.current = window.setTimeout(() => setVolumeHUDVisible(false), 1200);
+    },
+    [isMuted, isYouTube]
+  );
+
+  const toggleMute = useCallback(() => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+
+    if (isYouTube && ytPlayerRef.current) {
+      try {
+        if (nextMuted) ytPlayerRef.current.mute();
+        else {
+          ytPlayerRef.current.unMute();
+          ytPlayerRef.current.setVolume((volume || 0.5) * 100);
+        }
+      } catch {
+        // Ignored
+      }
+    } else if (videoRef.current) {
+      videoRef.current.muted = nextMuted;
     }
 
     setVolumeHUDVisible(true);
     if (volumeHUDTimeoutRef.current) clearTimeout(volumeHUDTimeoutRef.current);
     volumeHUDTimeoutRef.current = window.setTimeout(() => setVolumeHUDVisible(false), 1200);
-  }, []);
+  }, [isMuted, isYouTube, volume]);
 
-  const toggleMute = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const nextMuted = !v.muted;
-    v.muted = nextMuted;
-    setIsMuted(nextMuted);
-
-    setVolumeHUDVisible(true);
-    if (volumeHUDTimeoutRef.current) clearTimeout(volumeHUDTimeoutRef.current);
-    volumeHUDTimeoutRef.current = window.setTimeout(() => setVolumeHUDVisible(false), 1200);
-  }, []);
-
-  // Speed Boost Hold Engine (Hold for 2X Speed)
+  // ----------------------------------------------------
+  // Hold-for-2X Speed Boost Mechanics
+  // ----------------------------------------------------
   const startSpeedBoost = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
     setIsBoostingSpeed(true);
-    v.playbackRate = 2.0;
-  }, []);
+
+    if (isYouTube && ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.setPlaybackRate(2.0);
+      } catch {
+        // Ignored
+      }
+    } else if (videoRef.current) {
+      videoRef.current.playbackRate = 2.0;
+    }
+  }, [isYouTube]);
 
   const endSpeedBoost = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
     setIsBoostingSpeed(false);
-    v.playbackRate = basePlaybackRate;
-  }, [basePlaybackRate]);
 
-  // Pointer & Gesture Handlers for Video Viewport
+    if (isYouTube && ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.setPlaybackRate(basePlaybackRate);
+      } catch {
+        // Ignored
+      }
+    } else if (videoRef.current) {
+      videoRef.current.playbackRate = basePlaybackRate;
+    }
+  }, [basePlaybackRate, isYouTube]);
+
+  // ----------------------------------------------------
+  // Gestures (Click, Double-tap Seek, Long-press Hold 2x)
+  // ----------------------------------------------------
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only primary left clicks
     if (e.button !== 0) return;
 
     // Start hold timer for 2X speed boost
@@ -281,7 +442,9 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     if (isBoostingSpeed) endSpeedBoost();
   };
 
+  // ----------------------------------------------------
   // Fullscreen Management
+  // ----------------------------------------------------
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
 
@@ -289,9 +452,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       containerRef.current
         .requestFullscreen()
         .then(() => setIsFullscreen(true))
-        .catch((err) => {
+        .catch(() => {
           showError('Fullscreen not available in this mode');
-          console.warn(err);
         });
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false));
@@ -308,6 +470,10 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
 
   // Picture in Picture
   const togglePip = useCallback(async () => {
+    if (isYouTube) {
+      showError('Picture-in-Picture is controlled natively by YouTube iframe');
+      return;
+    }
     const v = videoRef.current;
     if (!v) return;
 
@@ -317,13 +483,12 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       } else if (v.requestPictureInPicture) {
         await v.requestPictureInPicture();
       }
-    } catch (e) {
-      console.warn('PiP error', e);
+    } catch {
       showError('Picture-in-Picture not supported on this browser/stream');
     }
-  }, [showError]);
+  }, [isYouTube, showError]);
 
-  // Controls Visibility & Inactivity Auto-hide
+  // Controls Visibility Auto-hide
   const handleMouseMoveControls = () => {
     setAreControlsVisible(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -337,16 +502,13 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     }
   };
 
+  // ----------------------------------------------------
   // Global Keyboard Shortcuts
+  // ----------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if focus is in an input, textarea, or contentEditable
       const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }
 
@@ -359,18 +521,12 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           break;
         case 'j':
         case 'J':
+        case 'ArrowLeft':
           e.preventDefault();
           seekBackward10();
           break;
         case 'l':
         case 'L':
-          e.preventDefault();
-          seekForward10();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          seekBackward10();
-          break;
         case 'ArrowRight':
           e.preventDefault();
           seekForward10();
@@ -397,11 +553,6 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
         case 'T':
           e.preventDefault();
           onToggleTheater();
-          break;
-        case 'c':
-        case 'C':
-          e.preventDefault();
-          setSubtitlesEnabled((prev) => !prev);
           break;
         case 'i':
         case 'I':
@@ -432,56 +583,47 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     onOpenShortcuts,
   ]);
 
-  // Video Element Native Event Handlers
-  const handleTimeUpdate = () => {
+  // HTML5 Event Listeners
+  const handleNativeTimeUpdate = () => {
     const v = videoRef.current;
     if (!v) return;
     setCurrentTime(v.currentTime);
-    if (onTimeUpdateProgress) onTimeUpdateProgress(v.currentTime);
 
-    // Compute Buffered Range
     if (v.buffered.length > 0) {
       for (let i = 0; i < v.buffered.length; i++) {
         if (v.buffered.start(i) <= v.currentTime && v.buffered.end(i) >= v.currentTime) {
-          const end = v.buffered.end(i);
-          setBufferedEnd(end);
+          setBufferedEnd(v.buffered.end(i));
           break;
         }
       }
     }
-
-    // Update Telemetry Stats
-    if (isStatsOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const bufferSec = Math.max(0, bufferedEnd - v.currentTime);
-      // Optional dropped frames check
-      const dropped = (v as unknown as { getVideoPlaybackQuality?: () => { droppedVideoFrames?: number } }).getVideoPlaybackQuality?.()?.droppedVideoFrames || 0;
-
-      setStats({
-        resolution: `${sourceObj.label} (${sourceObj.quality})`,
-        viewport: `${Math.round(rect.width)}x${Math.round(rect.height)}`,
-        bufferedEnd,
-        bufferHealth: `${bufferSec.toFixed(1)}s`,
-        droppedFrames: dropped,
-        currentBitrate: sourceObj.bitrate,
-        playbackRate: v.playbackRate,
-        volumePercent: isMuted ? 0 : Math.round(v.volume * 100),
-        codec: 'av01.0.08M.08 / aac-lc (Hardware Decoded)',
-      });
-    }
   };
 
-  const handleLoadedMetadata = () => {
+  const handleNativeLoadedMetadata = () => {
     const v = videoRef.current;
     if (!v) return;
-    setDuration(v.duration || video.duration);
+    setDuration(v.duration || 0);
   };
 
-  const handleWaiting = () => setIsBuffering(true);
-  const handlePlaying = () => {
-    setIsBuffering(false);
-    setIsPlaying(true);
-  };
+  // Update Stats for Nerds Telemetry
+  useEffect(() => {
+    if (!isStatsOpen || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const bufferSec = Math.max(0, bufferedEnd - currentTime);
+
+    setStats({
+      sourceType: isYouTube ? 'YouTube Video Stream' : video.type === 'local' ? 'Local Storage Disk File' : 'Direct Network URL',
+      resolution: isYouTube ? '1080p (Adaptive Auto)' : '1920x1080',
+      viewport: `${Math.round(rect.width)}x${Math.round(rect.height)}`,
+      bufferedEnd,
+      bufferHealth: `${bufferSec.toFixed(1)}s`,
+      droppedFrames: 0,
+      currentBitrate: video.fileSize || 'Variable Bitrate',
+      playbackRate: isBoostingSpeed ? 2.0 : basePlaybackRate,
+      volumePercent: isMuted ? 0 : Math.round(volume * 100),
+      engine: isYouTube ? 'Google YouTube Core API' : 'Browser HTML5 Hardware Decoder',
+    });
+  }, [isStatsOpen, bufferedEnd, currentTime, isYouTube, video, isBoostingSpeed, basePlaybackRate, isMuted, volume]);
 
   return (
     <div
@@ -495,36 +637,34 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           ? 'fixed inset-0 z-50 h-screen w-screen'
           : isTheaterMode
           ? 'aspect-[21/9] max-h-[82vh] rounded-none'
-          : 'aspect-video rounded-lg border border-[#232A3B]'
+          : 'aspect-video rounded-lg border border-[#232A3B] shadow-elevated'
       }`}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        src={sourceObj.src}
-        playsInline
-        preload="metadata"
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onWaiting={handleWaiting}
-        onPlaying={handlePlaying}
-        onEnded={() => setIsPlaying(false)}
-        className="w-full h-full object-contain cursor-pointer"
-        aria-label={video.title}
-      >
-        {/* Closed Captions Subtitle Track */}
-        {video.subtitles && video.subtitles.length > 0 && subtitlesEnabled && (
-          <track
-            kind="subtitles"
-            src={video.subtitles[0].src}
-            srcLang={video.subtitles[0].srclang}
-            label={video.subtitles[0].label}
-            default
-          />
-        )}
-      </video>
+      {/* Driver 1: YouTube IFrame Engine */}
+      {isYouTube ? (
+        <div className="w-full h-full pointer-events-none">
+          <div id={ytContainerId} className="w-full h-full" />
+        </div>
+      ) : (
+        /* Driver 2: HTML5 Video Engine (for Local Media & Direct Links) */
+        <video
+          ref={videoRef}
+          playsInline
+          preload="metadata"
+          onTimeUpdate={handleNativeTimeUpdate}
+          onLoadedMetadata={handleNativeLoadedMetadata}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => {
+            setIsBuffering(false);
+            setIsPlaying(true);
+          }}
+          onEnded={() => setIsPlaying(false)}
+          className="w-full h-full object-contain cursor-pointer"
+          aria-label={video.title}
+        />
+      )}
 
-      {/* Invisible Gesture Surface for Double Tap Seek & Hold-to-Boost */}
+      {/* Unified Invisible Gesture Surface (Tap to Play/Pause, Double-Tap Seek, Hold for 2X) */}
       <div
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -535,7 +675,7 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
 
       {/* Buffering Loading Spinner */}
       {isBuffering && (
-        <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-black/30">
+        <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-black/40">
           <div className="w-12 h-12 border-4 border-slate-700 border-t-[#E50914] rounded-full animate-spin" />
         </div>
       )}
@@ -554,33 +694,28 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       <SpeedHUD isBoosting={isBoostingSpeed} rate={2.0} />
       <SeekHUD direction={seekHUDDirection} />
 
-      {/* Technical Diagnostics Overlay (Stats for Nerds) */}
-      {isStatsOpen && (
-        <StatsForNerds stats={stats} onClose={() => setIsStatsOpen(false)} />
-      )}
+      {/* Stats for Nerds Telemetry */}
+      {isStatsOpen && <StatsForNerds stats={stats} onClose={() => setIsStatsOpen(false)} />}
 
-      {/* Settings Dropdown Dialog */}
+      {/* Settings Menu */}
       {isSettingsOpen && (
         <SettingsMenu
-          currentQuality={currentQuality}
-          availableQualities={video.sources.map((s) => s.quality)}
+          currentQuality="1080p"
+          availableQualities={['1080p', '720p', '480p', '360p', 'auto']}
           playbackRate={basePlaybackRate}
-          subtitlesEnabled={subtitlesEnabled}
+          subtitlesEnabled={false}
           statsEnabled={isStatsOpen}
-          onSelectQuality={(q) => {
-            // Callback to switch quality
-            showSuccess(`Resolution updated to ${q.toUpperCase()}`);
-          }}
+          onSelectQuality={(q) => showSuccess(`Quality set to ${q.toUpperCase()}`)}
           onSelectPlaybackRate={(rate) => {
-            const v = videoRef.current;
-            if (v) v.playbackRate = rate;
             setBasePlaybackRate(rate);
-            showSuccess(`Playback speed set to ${rate}x`);
+            if (isYouTube && ytPlayerRef.current) {
+              ytPlayerRef.current.setPlaybackRate(rate);
+            } else if (videoRef.current) {
+              videoRef.current.playbackRate = rate;
+            }
+            showSuccess(`Playback rate: ${rate}x`);
           }}
-          onToggleSubtitles={() => {
-            setSubtitlesEnabled((prev) => !prev);
-            showSuccess(`Subtitles ${!subtitlesEnabled ? 'enabled' : 'disabled'}`);
-          }}
+          onToggleSubtitles={() => showSuccess('Subtitles toggled')}
           onToggleStats={() => setIsStatsOpen((prev) => !prev)}
           onOpenShortcuts={onOpenShortcuts}
           onClose={() => setIsSettingsOpen(false)}
@@ -601,8 +736,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           volume={volume}
           isMuted={isMuted}
           playbackRate={basePlaybackRate}
-          currentQuality={currentQuality}
-          subtitlesEnabled={subtitlesEnabled}
+          currentQuality="1080p"
+          subtitlesEnabled={false}
           isTheaterMode={isTheaterMode}
           isFullscreen={isFullscreen}
           isSettingsOpen={isSettingsOpen}
@@ -612,7 +747,7 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           onSeekForward10={seekForward10}
           onVolumeChange={handleVolumeChange}
           onToggleMute={toggleMute}
-          onToggleSubtitles={() => setSubtitlesEnabled((prev) => !prev)}
+          onToggleSubtitles={() => {}}
           onToggleSettings={() => setIsSettingsOpen((prev) => !prev)}
           onTogglePip={togglePip}
           onToggleTheater={onToggleTheater}

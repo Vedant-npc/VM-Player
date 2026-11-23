@@ -1,55 +1,26 @@
-export type VideoQuality = '1080p' | '720p' | '480p' | '360p' | 'auto';
+export type VideoSourceType = 'youtube' | 'local' | 'direct';
+export type VideoQuality = '1080p' | '720p' | '480p' | '360p' | 'auto' | string;
 
-export interface VideoSource {
-  quality: VideoQuality;
-  src: string;
-  label: string;
-  fps: number;
-  bitrate: string;
-}
-
-export interface SubtitleTrack {
+export interface ActiveVideo {
   id: string;
-  label: string;
-  srclang: string;
-  src: string;
-  default?: boolean;
+  type: VideoSourceType;
+  title: string;
+  url: string;
+  youtubeId?: string;
+  fileSize?: string;
+  duration?: number;
+  formattedDuration?: string;
+  thumbnail?: string;
+  addedAt: string;
 }
 
-export interface VideoItem {
+export interface RecentItem {
   id: string;
   title: string;
-  description: string;
-  sources: VideoSource[];
-  thumbnail: string;
-  duration: number; // in seconds
-  formattedDuration: string;
-  views: number;
-  formattedViews: string;
-  uploadedAt: string;
-  channel: {
-    name: string;
-    avatar: string;
-    subscribers: string;
-    verified: boolean;
-  };
-  category: string;
-  tags: string[];
-  subtitles?: SubtitleTrack[];
-  likes: number;
-  isLiked?: boolean;
-  isSaved?: boolean;
-  progress?: number; // last watched timestamp in seconds
-}
-
-export interface CommentItem {
-  id: string;
-  author: string;
-  avatar: string;
-  content: string;
+  url: string;
+  type: VideoSourceType;
+  youtubeId?: string;
   timestamp: string;
-  likes: number;
-  isLiked?: boolean;
 }
 
 export interface ToastMessage {
@@ -60,6 +31,7 @@ export interface ToastMessage {
 }
 
 export interface PlayerStats {
+  sourceType: string;
   resolution: string;
   viewport: string;
   bufferedEnd: number;
@@ -68,7 +40,6 @@ export interface PlayerStats {
   currentBitrate: string;
   playbackRate: number;
   volumePercent: number;
-  codec: string;
+  codec?: string;
+  engine?: string;
 }
-
-export type ViewRoute = 'home' | 'watch' | 'trending' | 'library' | 'history' | 'saved' | 'stream-custom' | 'not-found';

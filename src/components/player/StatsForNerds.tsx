@@ -9,7 +9,7 @@ interface StatsForNerdsProps {
 
 export const StatsForNerds: React.FC<StatsForNerdsProps> = ({ stats, onClose }) => {
   return (
-    <div className="absolute top-4 left-4 z-40 max-w-sm w-full p-4 rounded bg-[#090C10]/95 border border-[#323B52] text-xs font-mono text-slate-200 shadow-elevated">
+    <div className="absolute top-4 left-4 z-40 max-w-sm w-full p-4 rounded bg-[#090C10]/95 border border-[#323B52] text-xs font-mono text-slate-200 shadow-elevated select-none">
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#232A3B]">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
@@ -25,13 +25,16 @@ export const StatsForNerds: React.FC<StatsForNerdsProps> = ({ stats, onClose }) 
       </div>
 
       <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 text-[11px]">
+        <span className="text-slate-400">Source Type:</span>
+        <span className="text-white font-semibold truncate">{stats.sourceType}</span>
+
         <span className="text-slate-400">Resolution:</span>
         <span className="text-white font-semibold">{stats.resolution}</span>
 
         <span className="text-slate-400">Viewport:</span>
         <span className="text-white">{stats.viewport}</span>
 
-        <span className="text-slate-400">Bitrate:</span>
+        <span className="text-slate-400">Bitrate / Size:</span>
         <span className="text-white">{stats.currentBitrate}</span>
 
         <span className="text-slate-400">Buffer Health:</span>
@@ -48,8 +51,8 @@ export const StatsForNerds: React.FC<StatsForNerdsProps> = ({ stats, onClose }) 
         <span className="text-slate-400">Volume Level:</span>
         <span className="text-white">{stats.volumePercent}%</span>
 
-        <span className="text-slate-400">Codec / Pipeline:</span>
-        <span className="text-white truncate">{stats.codec}</span>
+        <span className="text-slate-400">Decoder Pipeline:</span>
+        <span className="text-white truncate">{stats.engine || stats.codec || 'Native Hardware'}</span>
       </div>
     </div>
   );

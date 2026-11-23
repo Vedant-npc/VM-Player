@@ -1,7 +1,7 @@
 # VM Player - Architectural Specification & Technical Blueprint
 
 ## 1. Executive Overview
-**VM Player** is a high-performance, studio-grade video player and video streaming web platform built with React 19, TypeScript, and modern browser media APIs. It combines advanced video playback controls (sub-second seeking, dynamic volume HUD, press-and-hold 2x speed boost, adaptive quality switching, keyboard ergonomics) with a complete media catalog experience (browse, search, categorized feeds, watch history, custom URL stream ingest, and local file playback).
+**VM Player** is a dedicated, precision video player web application built with React 19, TypeScript, and modern browser media APIs. It combines dual-engine playback (YouTube IFrame API integration + HTML5 Hardware Video Decoding) with advanced playback controls: sub-second 10s seeking, on-screen dynamic volume HUD, press-and-hold 2X speed boost, theater mode, keyboard ergonomics, and drag-and-drop local file ingestion.
 
 ---
 
@@ -9,34 +9,30 @@
 
 ```mermaid
 flowchart TD
-    App[App Shell & Router] --> Header[Global Header: Search, Stream Ingest, Settings]
-    App --> Sidebar[Collapsible Navigation: Library, Feeds, Playlists]
-    App --> RouteContainer[View Router]
-    
-    RouteContainer --> HomeView[Home Feed: Recommended, Channels, Topics]
-    RouteContainer --> WatchView[Watch Page: Video Player + Metadata + Recommendations]
-    RouteContainer --> TrendingView[Trending Feed: Curated High-Engagement Streams]
-    RouteContainer --> LibraryView[User Library: History, Watch Later, Saved]
-    RouteContainer --> LocalPlayerView[Local File & Custom Stream Ingestion]
-    RouteContainer --> NotFoundView[404 Custom Error View]
+    App[App Shell & Layout] --> Navbar[Top Navbar: Quick URL Input, Open File, Shortcuts]
+    App --> GlobalDropZone[Global Drag & Drop Overlay: File Explorer Hook]
+    App --> PlayerView[Main Player View]
+    App --> Footer[Footer: Working Links, Shortcuts, Support Email, 2026 Copyright]
 
-    WatchView --> VMPlayer[VM Player Engine]
-    LocalPlayerView --> VMPlayer
+    PlayerView -->|No Video Active| Launcher[Launcher Hub: Paste URL Card + Drag/Drop File Zone + Recents]
+    PlayerView -->|Video Active| VMPlayer[VM Player Unified Engine]
 
     subgraph "VM Player Engine Architecture"
-        VMPlayer --> MediaSurface[HTML5 Video Element + Stream Driver]
+        VMPlayer --> DriverSwitch{Engine Driver Selector}
+        DriverSwitch -->|YouTube Link| YTDriver[YouTube IFrame API Engine]
+        DriverSwitch -->|Local Disk / Direct URL| HTML5Driver[HTML5 Hardware Video Element]
+
         VMPlayer --> GestureEngine[Gesture & Touch Controller: Long-press 2x, Double-tap Seek]
         VMPlayer --> OverlayHUD[HUD Overlays: 2X Banner, Volume Meter, Seek Ripple, Buffer Spinner]
         VMPlayer --> ControlsBar[Custom Controls Bar]
-        VMPlayer --> SettingsDialog[Settings Menu: Quality, Playback Rate, Subtitles, Stats for Nerds]
+        VMPlayer --> SettingsDialog[Settings Menu: Quality, Playback Rate, Stats for Nerds]
         
-        ControlsBar --> Timeline[Scrubber Bar + Buffer Bar + Hover Time Thumbnail]
+        ControlsBar --> Timeline[Scrubber Bar + Buffer Bar + Hover Time Tooltip]
         ControlsBar --> PlaybackGroup[Play/Pause, Seek -10s, Seek +10s, Volume Slider]
-        ControlsBar --> ActionGroup[Captions Toggle, Quality Badge, Theater Mode, PiP, Fullscreen]
+        ControlsBar --> ActionGroup[Quality Badge, Theater Mode, PiP, Fullscreen]
     end
 
-    App --> StateStore[Global Media & User Preferences Store]
-    StateStore --> LocalStorage[(Browser LocalStorage Persistence)]
+    App --> StateStore[Player Context & LocalStorage Persistence]
     StateStore --> ToastManager[Toast Notification Engine]
 ```
 
@@ -44,61 +40,29 @@ flowchart TD
 
 ## 3. Core Engine Specifications
 
-### 3.1 Playback & Seek Mechanics
+### 3.1 Dual-Engine Driver Architecture
+- **YouTube Playback Driver**:
+  - Dynamically loads `https://www.youtube.com/iframe_api`.
+  - Extracts YouTube ID from any standard watch URL, `youtu.be` shortlink, embed, or shorts link.
+  - Controls playback rate, volume, play/pause, and seeking programmatically under a unified gesture layer.
+- **Local Media & Direct URL Driver**:
+  - Uses native HTML5 `<video>` element with GPU hardware decoding.
+  - Local files ingested via `URL.createObjectURL(file)` with zero server upload.
+  - Supports `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`, `.m4v`.
+
+### 3.2 Playback Mechanics
 - **10-Second Seek Engine**:
-  - Dedicated `-10s` and `+10s` hardware-accelerated seek triggers.
-  - Double-tap/double-click on left 35% of video viewport decrements position by 10s with directional chevron ripple animation.
-  - Double-tap/double-click on right 35% of video viewport increments position by 10s with directional chevron ripple animation.
+  - Dedicated `-10s` and `+10s` buttons on the control toolbar.
+  - Left double-click/double-tap decrements position by 10s with directional chevron ripple animation.
+  - Right double-click/double-tap increments position by 10s with directional chevron ripple animation.
   - Keyboard mappings: `J` / `ArrowLeft` (-10s), `L` / `ArrowRight` (+10s).
 - **Play/Pause Engine**:
-  - Center-viewport click, bottom control button, and `Space` / `K` keyboard shortcuts.
-  - Transient central SVG indicator that scales and fades smoothly upon state transition.
+  - Spacebar or `K` key shortcut, bottom control button, and center video click.
+  - Transient central SVG indicator scales and fades smoothly upon state changes.
 - **Dynamic Volume HUD & Animation**:
-  - Real-time volume gauge with 4 distinct visual states: Muted (0%), Low (1-33%), Mid (34-66%), High (67-100%).
-  - Volume HUD overlay flashes on the screen during keyboard adjustments (`ArrowUp`, `ArrowDown`) showing numerical percentage and level bars.
-  - Exponential acoustic volume curve for natural auditory response.
+  - 4-state responsive speaker icon: Muted (0%), Low (1-33%), Mid (34-66%), and High (67-100%).
+  - Real-time volume HUD overlay flashes on the screen during keyboard adjustments (`ArrowUp`, `ArrowDown`) showing numerical percentage and level bars.
 - **Hold-for-2X Speed Boost**:
   - Pointer down / touch start tracking with 250ms threshold.
-  - Smooth ramp to `playbackRate = 2.0` with visual banner `>> 2X Speed`.
-  - Pointer release resets `playbackRate` to user's previously configured base rate (e.g. 1.0x).
-  - Also toggled via keyboard hold (`Space` hold or `Shift + >`).
-- **High-Quality Adaptive Stream Support**:
-  - Multi-resolution stream ladder (1080p60, 720p, 480p, 360p, Auto).
-  - Track buffered time ranges via `HTMLMediaElement.buffered` with a dedicated dual-layer track.
-  - Picture-in-Picture (PiP) via `requestPictureInPicture()` with API fallback.
-  - Custom stream ingestion for any valid MP4, WebM, or HLS link.
-  - Zero-upload local video playback via `URL.createObjectURL(file)`.
-
----
-
-## 4. UI Architecture & Anti-"Vibe-Coding" Design System
-
-The application strictly enforces solid, high-contrast, production broadcast design:
-
-| Element | Specification | Rationale |
-| :--- | :--- | :--- |
-| **Color System** | Studio Deep Slate (`#0B0E14`, `#121620`, `#1A202C`), High-Contrast Pure White (`#FFFFFF`), Studio Red (`#E50914`), Zinc Neutral (`#71717A`) | Avoids low-contrast dark mode and generic purple gradients; maximizes readability. |
-| **Typography** | `Plus Jakarta Sans`, system `-apple-system`, `Segoe UI`, `Roboto` | Clean geometric humanist typography without overused Inter or serif italic gimmicks. |
-| **Surfaces** | Solid opaque surfaces with crisp 1px borders (`#262E3D`, `#2D3748`) | Eliminates fragile glassmorphism and colored left borders. |
-| **Transitions** | Fast, deterministic micro-interactions (`150ms ease-out`), crisp button background shifts | No fading scroll triggers, no cursor light beams, no button opacity fade bugs. |
-| **Icons** | Custom, purpose-built SVG symbols optimized for video broadcast | Cohesive stroke weight (2px), pixel-aligned, no bloated generic icon sets. |
-| **Layout & Grid** | Strict 4px/8px rhythm (`gap-4`, `p-4`, `p-6`), `overflow-x-hidden` on root container | 100% mobile-optimized with collapsible sidebar drawer and full touch-control support. |
-
----
-
-## 5. Keyboard Navigation & Accessibility Matrix
-
-| Key Code | Target Action | Visual Feedback |
-| :--- | :--- | :--- |
-| `Space` / `K` | Toggle Play / Pause | Central animated glyph + bottom bar icon |
-| `J` / `ArrowLeft` | Seek backward 10 seconds | Left chevron ripple animation (-10s) |
-| `L` / `ArrowRight` | Seek forward 10 seconds | Right chevron ripple animation (+10s) |
-| `ArrowUp` | Increase volume by 5% | Top-right HUD volume meter & sound icon |
-| `ArrowDown` | Decrease volume by 5% | Top-right HUD volume meter & sound icon |
-| `M` | Toggle Mute | Mute indicator on HUD and control bar |
-| `F` | Toggle Fullscreen | Viewport expansion to native fullscreen |
-| `T` | Toggle Theater Mode | Widescreen player expansion above metadata |
-| `C` | Toggle Closed Captions | Captions overlay toggle & active underline |
-| `I` | Toggle Mini-Player / PiP | System Picture-in-Picture window |
-| `>` / `<` | Speed up / Slow down step | Speed badge updated in settings menu |
-| `?` | Show Shortcuts Modal | Comprehensive interactive shortcuts sheet |
+  - Smooth ramp to `playbackRate = 2.0` with visual banner `>> 2.0X SPEED ACTIVE [HOLDING]`.
+  - Pointer release resets `playbackRate` to user's prior base rate.

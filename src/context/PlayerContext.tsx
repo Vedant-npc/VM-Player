@@ -1,309 +1,233 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { VideoItem, VideoQuality, ViewRoute } from '../types/media';
-import { INITIAL_VIDEOS } from '../data/mockVideos';
+import type { ActiveVideo, RecentItem } from '../types/media';
 import { useToast } from './ToastContext';
+import { extractYouTubeId } from '../utils/youtube';
 
 interface PlayerContextType {
-  allVideos: VideoItem[];
-  currentVideo: VideoItem;
-  currentQuality: VideoQuality;
-  activeRoute: ViewRoute;
-  searchQuery: string;
-  selectedCategory: string;
-  watchHistory: VideoItem[];
-  savedVideos: VideoItem[];
-  likedVideoIds: string[];
-  subscribedChannels: string[];
+  currentVideo: ActiveVideo | null;
+  recentVideos: RecentItem[];
   isShortcutsOpen: boolean;
-  isStreamModalOpen: boolean;
-  sidebarOpen: boolean;
-  
+  isDraggingGlobal: boolean;
+
   // Actions
-  selectVideo: (video: VideoItem) => void;
-  setQuality: (quality: VideoQuality) => void;
-  setRoute: (route: ViewRoute) => void;
-  setSearchQuery: (query: string) => void;
-  setSelectedCategory: (cat: string) => void;
-  toggleLikeVideo: (video: VideoItem) => void;
-  toggleSaveVideo: (video: VideoItem) => void;
-  toggleSubscribeChannel: (channelName: string) => void;
-  addToHistory: (video: VideoItem, progressSeconds?: number) => void;
-  clearHistory: () => void;
-  addCustomVideo: (video: VideoItem) => void;
+  loadYouTubeVideo: (url: string) => Promise<boolean>;
+  loadLocalFile: (file: File) => boolean;
+  loadDirectUrl: (url: string, customTitle?: string) => boolean;
+  clearCurrentVideo: () => void;
+  clearRecentVideos: () => void;
+  removeRecentItem: (id: string) => void;
   toggleShortcutsModal: (open?: boolean) => void;
-  toggleStreamModal: (open?: boolean) => void;
-  toggleSidebar: (open?: boolean) => void;
+  setIsDraggingGlobal: (dragging: boolean) => void;
 }
 
-const STORAGE_KEYS = {
-  HISTORY: 'vm_player_history_v1',
-  SAVED: 'vm_player_saved_v1',
-  LIKED: 'vm_player_liked_v1',
-  CHANNELS: 'vm_player_channels_v1',
-  CUSTOM_VIDEOS: 'vm_player_custom_videos_v1',
-  QUALITY: 'vm_player_quality_v1',
-};
+const STORAGE_KEY_RECENTS = 'vm_player_recents_v2';
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
 
-  const [allVideos, setAllVideos] = useState<VideoItem[]>(() => {
+  const [currentVideo, setCurrentVideo] = useState<ActiveVideo | null>(null);
+  const [recentVideos, setRecentVideos] = useState<RecentItem[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_VIDEOS);
-      if (stored) {
-        const custom = JSON.parse(stored) as VideoItem[];
-        return [...custom, ...INITIAL_VIDEOS];
-      }
-    } catch {
-      // Fallback
-    }
-    return INITIAL_VIDEOS;
-  });
-
-  const [currentVideo, setCurrentVideo] = useState<VideoItem>(allVideos[0]);
-  const [currentQuality, setCurrentQuality] = useState<VideoQuality>(() => {
-    return (localStorage.getItem(STORAGE_KEYS.QUALITY) as VideoQuality) || '1080p';
-  });
-
-  const [activeRoute, setActiveRouteState] = useState<ViewRoute>('home');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-
-  const [watchHistory, setWatchHistory] = useState<VideoItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.HISTORY);
+      const stored = localStorage.getItem(STORAGE_KEY_RECENTS);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
-    }
-  });
-
-  const [savedVideos, setSavedVideos] = useState<VideoItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.SAVED);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [likedVideoIds, setLikedVideoIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.LIKED);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [subscribedChannels, setSubscribedChannels] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CHANNELS);
-      return stored ? JSON.parse(stored) : ['Blender Cinema Studios'];
-    } catch {
-      return ['Blender Cinema Studios'];
     }
   });
 
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
-  const [isStreamModalOpen, setIsStreamModalOpen] = useState<boolean>(false);
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [isDraggingGlobal, setIsDraggingGlobal] = useState<boolean>(false);
 
-  // Sync state to LocalStorage
+  // Sync recents to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(watchHistory));
+      localStorage.setItem(STORAGE_KEY_RECENTS, JSON.stringify(recentVideos));
     } catch (e) {
-      console.warn('Storage quota exceeded for history', e);
+      console.warn('Storage error', e);
     }
-  }, [watchHistory]);
+  }, [recentVideos]);
 
+  // Dynamic Document Title
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SAVED, JSON.stringify(savedVideos));
-    } catch (e) {
-      console.warn('Storage quota exceeded for saved videos', e);
+    if (currentVideo) {
+      document.title = `VM Player - Playing: ${currentVideo.title}`;
+    } else {
+      document.title = 'VM Player - High Performance Video & Media Player';
     }
-  }, [savedVideos]);
+  }, [currentVideo]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.LIKED, JSON.stringify(likedVideoIds));
-    } catch (e) {
-      console.warn('Storage quota exceeded for likes', e);
-    }
-  }, [likedVideoIds]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.CHANNELS, JSON.stringify(subscribedChannels));
-    } catch (e) {
-      console.warn('Storage quota exceeded for channels', e);
-    }
-  }, [subscribedChannels]);
-
-  // Route & Document Title Management (Strict rule: Fix page titles)
-  const setRoute = useCallback((route: ViewRoute) => {
-    setActiveRouteState(route);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    switch (route) {
-      case 'home':
-        document.title = 'VM Player - High Performance Studio Streaming';
-        break;
-      case 'watch':
-        document.title = `VM Player - Watch: ${currentVideo.title}`;
-        break;
-      case 'trending':
-        document.title = 'VM Player - Trending Video Broadcasts';
-        break;
-      case 'library':
-        document.title = 'VM Player - Your Library & Watch Later';
-        break;
-      case 'history':
-        document.title = 'VM Player - Playback History';
-        break;
-      case 'saved':
-        document.title = 'VM Player - Saved Playlists & Watch Later';
-        break;
-      case 'stream-custom':
-        document.title = 'VM Player - Ingest Custom Video & Local Media';
-        break;
-      case 'not-found':
-        document.title = 'VM Player - 404 Broadcast Not Found';
-        break;
-      default:
-        document.title = 'VM Player';
-    }
-  }, [currentVideo.title]);
-
-  // Select video and navigate to watch page
-  const selectVideo = useCallback((video: VideoItem) => {
-    setCurrentVideo(video);
-    setRoute('watch');
-    document.title = `VM Player - Watch: ${video.title}`;
-  }, [setRoute]);
-
-  const setQuality = useCallback((quality: VideoQuality) => {
-    setCurrentQuality(quality);
-    localStorage.setItem(STORAGE_KEYS.QUALITY, quality);
-    showSuccess(`Stream resolution switched to ${quality.toUpperCase()}`);
-  }, [showSuccess]);
-
-  const toggleLikeVideo = useCallback((video: VideoItem) => {
-    setLikedVideoIds((prev) => {
-      const exists = prev.includes(video.id);
-      if (exists) {
-        showInfo(`Removed "${video.title}" from liked videos`);
-        return prev.filter((id) => id !== video.id);
-      } else {
-        showSuccess(`Added "${video.title}" to liked videos`);
-        return [...prev, video.id];
-      }
-    });
-  }, [showInfo, showSuccess]);
-
-  const toggleSaveVideo = useCallback((video: VideoItem) => {
-    setSavedVideos((prev) => {
-      const exists = prev.some((v) => v.id === video.id);
-      if (exists) {
-        showInfo(`Removed from Watch Later`);
-        return prev.filter((v) => v.id !== video.id);
-      } else {
-        showSuccess(`Saved to Watch Later`);
-        return [video, ...prev];
-      }
-    });
-  }, [showInfo, showSuccess]);
-
-  const toggleSubscribeChannel = useCallback((channelName: string) => {
-    setSubscribedChannels((prev) => {
-      const exists = prev.includes(channelName);
-      if (exists) {
-        showInfo(`Unsubscribed from ${channelName}`);
-        return prev.filter((c) => c !== channelName);
-      } else {
-        showSuccess(`Subscribed to ${channelName}`);
-        return [...prev, channelName];
-      }
-    });
-  }, [showInfo, showSuccess]);
-
-  const addToHistory = useCallback((video: VideoItem, progressSeconds?: number) => {
-    setWatchHistory((prev) => {
-      const filtered = prev.filter((v) => v.id !== video.id);
-      const updated: VideoItem = {
-        ...video,
-        progress: progressSeconds !== undefined ? progressSeconds : video.progress,
-      };
-      return [updated, ...filtered].slice(0, 50); // keep last 50
+  const addRecent = useCallback((item: RecentItem) => {
+    setRecentVideos((prev) => {
+      const filtered = prev.filter((r) => r.url !== item.url);
+      return [item, ...filtered].slice(0, 20); // Keep last 20
     });
   }, []);
 
-  const clearHistory = useCallback(() => {
-    setWatchHistory([]);
-    showSuccess('Watch history cleared successfully');
+  const loadYouTubeVideo = useCallback(
+    async (url: string): Promise<boolean> => {
+      const ytid = extractYouTubeId(url);
+      if (!ytid) {
+        showError('Invalid YouTube URL. Please provide a valid YouTube watch or share link.');
+        return false;
+      }
+
+      let videoTitle = `YouTube Video (${ytid})`;
+      try {
+        const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${ytid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.title) {
+            videoTitle = data.title;
+          }
+        }
+      } catch {
+        // Fallback to default title
+      }
+
+      const active: ActiveVideo = {
+        id: `yt-${ytid}-${Date.now()}`,
+        type: 'youtube',
+        title: videoTitle,
+        url: url.trim(),
+        youtubeId: ytid,
+        thumbnail: `https://i.ytimg.com/vi/${ytid}/hqdefault.jpg`,
+        addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setCurrentVideo(active);
+      addRecent({
+        id: active.id,
+        title: videoTitle,
+        url: url.trim(),
+        type: 'youtube',
+        youtubeId: ytid,
+        timestamp: 'Recently played',
+      });
+
+      showSuccess(`Loaded YouTube video: "${videoTitle}"`);
+      return true;
+    },
+    [addRecent, showError, showSuccess]
+  );
+
+  const loadLocalFile = useCallback(
+    (file: File): boolean => {
+      if (!file) return false;
+      if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mkv|mov|avi|m4v)$/i)) {
+        showError('Selected file is not recognized as a supported video container (.mp4, .webm, .mkv, .mov)');
+        return false;
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+      const cleanName = file.name.replace(/\.[^/.]+$/, '');
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+
+      const active: ActiveVideo = {
+        id: `local-${Date.now()}`,
+        type: 'local',
+        title: cleanName,
+        url: objectUrl,
+        fileSize: `${sizeMb} MB`,
+        addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setCurrentVideo(active);
+      showSuccess(`Loaded local video: "${file.name}" (${sizeMb} MB)`);
+      return true;
+    },
+    [showError, showSuccess]
+  );
+
+  const loadDirectUrl = useCallback(
+    (url: string, customTitle?: string): boolean => {
+      const trimmed = url.trim();
+      if (!trimmed) {
+        showError('Please enter a valid video URL');
+        return false;
+      }
+
+      // Check if it's actually YouTube first
+      if (extractYouTubeId(trimmed)) {
+        loadYouTubeVideo(trimmed);
+        return true;
+      }
+
+      try {
+        new URL(trimmed);
+      } catch {
+        showError('Invalid URL protocol. Please include http:// or https://');
+        return false;
+      }
+
+      const cleanName = customTitle?.trim() || trimmed.split('/').pop()?.split('?')[0] || 'Network Video Stream';
+
+      const active: ActiveVideo = {
+        id: `direct-${Date.now()}`,
+        type: 'direct',
+        title: cleanName,
+        url: trimmed,
+        addedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setCurrentVideo(active);
+      addRecent({
+        id: active.id,
+        title: cleanName,
+        url: trimmed,
+        type: 'direct',
+        timestamp: 'Recently played',
+      });
+
+      showSuccess(`Loaded stream: "${cleanName}"`);
+      return true;
+    },
+    [addRecent, loadYouTubeVideo, showError, showSuccess]
+  );
+
+  const clearCurrentVideo = useCallback(() => {
+    setCurrentVideo(null);
+    showInfo('Player cleared. Ready for your next video.');
+  }, [showInfo]);
+
+  const clearRecentVideos = useCallback(() => {
+    setRecentVideos([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_RECENTS);
+    } catch {
+      // Ignored
+    }
+    showSuccess('Recent playback list cleared');
   }, [showSuccess]);
 
-  const addCustomVideo = useCallback((video: VideoItem) => {
-    setAllVideos((prev) => [video, ...prev]);
-    setCurrentVideo(video);
-    setRoute('watch');
-    showSuccess(`Loaded stream: ${video.title}`);
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_VIDEOS);
-      const customList = stored ? JSON.parse(stored) : [];
-      localStorage.setItem(STORAGE_KEYS.CUSTOM_VIDEOS, JSON.stringify([video, ...customList]));
-    } catch (e) {
-      console.warn('Could not persist custom video to storage', e);
-    }
-  }, [setRoute, showSuccess]);
+  const removeRecentItem = useCallback(
+    (id: string) => {
+      setRecentVideos((prev) => prev.filter((r) => r.id !== id));
+      showInfo('Removed item from recents');
+    },
+    [showInfo]
+  );
 
   const toggleShortcutsModal = useCallback((open?: boolean) => {
     setIsShortcutsOpen((prev) => (open !== undefined ? open : !prev));
   }, []);
 
-  const toggleStreamModal = useCallback((open?: boolean) => {
-    setIsStreamModalOpen((prev) => (open !== undefined ? open : !prev));
-  }, []);
-
-  const toggleSidebar = useCallback((open?: boolean) => {
-    setSidebarOpen((prev) => (open !== undefined ? open : !prev));
-  }, []);
-
   return (
     <PlayerContext.Provider
       value={{
-        allVideos,
         currentVideo,
-        currentQuality,
-        activeRoute,
-        searchQuery,
-        selectedCategory,
-        watchHistory,
-        savedVideos,
-        likedVideoIds,
-        subscribedChannels,
+        recentVideos,
         isShortcutsOpen,
-        isStreamModalOpen,
-        sidebarOpen,
-        selectVideo,
-        setQuality,
-        setRoute,
-        setSearchQuery,
-        setSelectedCategory,
-        toggleLikeVideo,
-        toggleSaveVideo,
-        toggleSubscribeChannel,
-        addToHistory,
-        clearHistory,
-        addCustomVideo,
+        isDraggingGlobal,
+        loadYouTubeVideo,
+        loadLocalFile,
+        loadDirectUrl,
+        clearCurrentVideo,
+        clearRecentVideos,
+        removeRecentItem,
         toggleShortcutsModal,
-        toggleStreamModal,
-        toggleSidebar,
+        setIsDraggingGlobal,
       }}
     >
       {children}
