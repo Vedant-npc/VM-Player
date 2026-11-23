@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <rect width="48" height="48" rx="10" fill="#0E121A"/>
+  <rect x="2" y="2" width="44" height="44" rx="8" stroke="#232A3B" stroke-width="2" fill="none"/>
+  <!-- V Shape in Studio Red -->
+  <path d="M 11 14 L 21 34 L 25 34 L 17 14 Z" fill="#E50914"/>
+  <!-- Media Play Arrow merged into M -->
+  <path d="M 23 14 L 31 30 L 39 14 L 35 14 L 29 26 L 25 18 Z" fill="#FFFFFF"/>
+  <polygon points="21,17 31,23 21,29" fill="#E50914"/>
+</svg>
