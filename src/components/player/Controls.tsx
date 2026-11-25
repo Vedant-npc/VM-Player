@@ -2,8 +2,8 @@ import React from 'react';
 import {
   PlayIcon,
   PauseIcon,
-  SeekBackward10Icon,
-  SeekForward10Icon,
+  SeekBackward5Icon,
+  SeekForward5Icon,
   VolumeHighIcon,
   VolumeMidIcon,
   VolumeLowIcon,
@@ -33,8 +33,8 @@ interface ControlsProps {
   isSettingsOpen: boolean;
   onTogglePlay: () => void;
   onSeek: (seconds: number) => void;
-  onSeekBackward10: () => void;
-  onSeekForward10: () => void;
+  onSeekBackward5: () => void;
+  onSeekForward5: () => void;
   onVolumeChange: (vol: number) => void;
   onToggleMute: () => void;
   onToggleSubtitles: () => void;
@@ -70,8 +70,8 @@ export const Controls: React.FC<ControlsProps> = ({
   isSettingsOpen,
   onTogglePlay,
   onSeek,
-  onSeekBackward10,
-  onSeekForward10,
+  onSeekBackward5,
+  onSeekForward5,
   onVolumeChange,
   onToggleMute,
   onToggleSubtitles,
@@ -104,7 +104,7 @@ export const Controls: React.FC<ControlsProps> = ({
 
       {/* Control Actions Row */}
       <div className="flex items-center justify-between gap-2 mt-1 text-white select-none">
-        {/* Left Action Cluster: Play/Pause, -10s, +10s, Volume, Time */}
+        {/* Left Action Cluster: Play/Pause, -5s, +5s, Volume, Time */}
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Play/Pause */}
           <button
@@ -116,24 +116,24 @@ export const Controls: React.FC<ControlsProps> = ({
             {isPlaying ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
           </button>
 
-          {/* Seek Backward 10 Seconds */}
+          {/* Seek Backward 5 Seconds */}
           <button
-            onClick={onSeekBackward10}
+            onClick={onSeekBackward5}
             className="p-2 rounded hover:bg-[#1D2332] text-white transition-colors focus:outline-none flex items-center justify-center"
-            aria-label="Seek backward 10 seconds (J or Left Arrow)"
-            title="Seek -10s (j)"
+            aria-label="Seek backward 5 seconds (J or Left Arrow)"
+            title="Seek -5s (j)"
           >
-            <SeekBackward10Icon size={20} />
+            <SeekBackward5Icon size={20} />
           </button>
 
-          {/* Seek Forward 10 Seconds */}
+          {/* Seek Forward 5 Seconds */}
           <button
-            onClick={onSeekForward10}
+            onClick={onSeekForward5}
             className="p-2 rounded hover:bg-[#1D2332] text-white transition-colors focus:outline-none flex items-center justify-center"
-            aria-label="Seek forward 10 seconds (L or Right Arrow)"
-            title="Seek +10s (l)"
+            aria-label="Seek forward 5 seconds (L or Right Arrow)"
+            title="Seek +5s (l)"
           >
-            <SeekForward10Icon size={20} />
+            <SeekForward5Icon size={20} />
           </button>
 
           {/* Volume Low/High Animation Group */}

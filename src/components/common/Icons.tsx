@@ -18,23 +18,23 @@ export const PauseIcon: React.FC<IconProps> = ({ size = 20, className = '', ...p
   </svg>
 );
 
-export const SeekBackward10Icon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+export const SeekBackward5Icon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
     {/* Circular counter-clockwise arrow */}
     <path d="M 12 4 A 8 8 0 1 0 20 12" />
     <polyline points="12 1 12 5 8 5" />
-    {/* -10 text */}
-    <text x="12" y="15" fill="currentColor" stroke="none" fontSize="8" fontWeight="800" textAnchor="middle" fontFamily="sans-serif">10</text>
+    {/* -5 text */}
+    <text x="12" y="15" fill="currentColor" stroke="none" fontSize="8" fontWeight="800" textAnchor="middle" fontFamily="sans-serif">5</text>
   </svg>
 );
 
-export const SeekForward10Icon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
+export const SeekForward5Icon: React.FC<IconProps> = ({ size = 20, className = '', ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
     {/* Circular clockwise arrow */}
     <path d="M 12 4 A 8 8 0 1 1 4 12" />
     <polyline points="12 1 12 5 16 5" />
-    {/* +10 text */}
-    <text x="12" y="15" fill="currentColor" stroke="none" fontSize="8" fontWeight="800" textAnchor="middle" fontFamily="sans-serif">10</text>
+    {/* +5 text */}
+    <text x="12" y="15" fill="currentColor" stroke="none" fontSize="8" fontWeight="800" textAnchor="middle" fontFamily="sans-serif">5</text>
   </svg>
 );
 

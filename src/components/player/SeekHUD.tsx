@@ -1,5 +1,5 @@
 import React from 'react';
-import { SeekBackward10Icon, SeekForward10Icon } from '../common/Icons';
+import { SeekBackward5Icon, SeekForward5Icon } from '../common/Icons';
 
 interface SeekHUDProps {
   direction: 'backward' | 'forward' | null;
@@ -19,13 +19,13 @@ export const SeekHUD: React.FC<SeekHUDProps> = ({ direction }) => {
       <div className="flex flex-col items-center justify-center w-24 h-24 rounded-full bg-[#0E121A]/85 border border-[#323B52] text-white shadow-solid animate-ripple">
         {isBackward ? (
           <>
-            <SeekBackward10Icon size={34} className="text-[#E50914]" />
-            <span className="text-xs font-bold font-mono tracking-wider text-slate-100 mt-1">-10s</span>
+            <SeekBackward5Icon size={34} className="text-[#E50914]" />
+            <span className="text-xs font-bold font-mono tracking-wider text-slate-100 mt-1">-5s</span>
           </>
         ) : (
           <>
-            <SeekForward10Icon size={34} className="text-[#E50914]" />
-            <span className="text-xs font-bold font-mono tracking-wider text-slate-100 mt-1">+10s</span>
+            <SeekForward5Icon size={34} className="text-[#E50914]" />
+            <span className="text-xs font-bold font-mono tracking-wider text-slate-100 mt-1">+5s</span>
           </>
         )}
       </div>

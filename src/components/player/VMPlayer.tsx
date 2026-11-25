@@ -257,7 +257,7 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
   }, [isPlaying, isYouTube, showError]);
 
   // ----------------------------------------------------
-  // Seeking Mechanics (-10s / +10s / Scrubber)
+  // Seeking Mechanics (-5s / +5s / Scrubber)
   // ----------------------------------------------------
   const handleSeek = useCallback(
     (targetSeconds: number) => {
@@ -281,8 +281,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     [duration, isYouTube]
   );
 
-  const seekBackward10 = useCallback(() => {
-    const nextTime = Math.max(0, currentTime - 10);
+  const seekBackward5 = useCallback(() => {
+    const nextTime = Math.max(0, currentTime - 5);
     handleSeek(nextTime);
 
     setSeekHUDDirection('backward');
@@ -290,8 +290,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     seekHUDTimeoutRef.current = window.setTimeout(() => setSeekHUDDirection(null), 600);
   }, [currentTime, handleSeek]);
 
-  const seekForward10 = useCallback(() => {
-    const nextTime = Math.min(duration, currentTime + 10);
+  const seekForward5 = useCallback(() => {
+    const nextTime = Math.min(duration, currentTime + 5);
     handleSeek(nextTime);
 
     setSeekHUDDirection('forward');
@@ -410,7 +410,7 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       return;
     }
 
-    // Handle single vs double click / tap for 10s seek
+    // Handle single vs double click / tap for 5s seek
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const isLeftThird = clickX < rect.width * 0.35;
@@ -428,9 +428,9 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
       clickCountRef.current = 0;
 
       if (isLeftThird) {
-        seekBackward10();
+        seekBackward5();
       } else if (isRightThird) {
-        seekForward10();
+        seekForward5();
       } else {
         togglePlay();
       }
@@ -523,13 +523,13 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
         case 'J':
         case 'ArrowLeft':
           e.preventDefault();
-          seekBackward10();
+          seekBackward5();
           break;
         case 'l':
         case 'L':
         case 'ArrowRight':
           e.preventDefault();
-          seekForward10();
+          seekForward5();
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -572,8 +572,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     togglePlay,
-    seekBackward10,
-    seekForward10,
+    seekBackward5,
+    seekForward5,
     handleVolumeChange,
     volume,
     toggleMute,
@@ -743,8 +743,8 @@ export const VMPlayer: React.FC<VMPlayerProps> = ({
           isSettingsOpen={isSettingsOpen}
           onTogglePlay={togglePlay}
           onSeek={handleSeek}
-          onSeekBackward10={seekBackward10}
-          onSeekForward10={seekForward10}
+          onSeekBackward5={seekBackward5}
+          onSeekForward5={seekForward5}
           onVolumeChange={handleVolumeChange}
           onToggleMute={toggleMute}
           onToggleSubtitles={() => {}}

@@ -1,7 +1,7 @@
 # VM Player - Architectural Specification & Technical Blueprint
 
 ## 1. Executive Overview
-**VM Player** is a dedicated, precision video player web application built with React 19, TypeScript, and modern browser media APIs. It combines dual-engine playback (YouTube IFrame API integration + HTML5 Hardware Video Decoding) with advanced playback controls: sub-second 10s seeking, on-screen dynamic volume HUD, press-and-hold 2X speed boost, theater mode, keyboard ergonomics, and drag-and-drop local file ingestion.
+**VM Player** is a dedicated, precision video player web application built with React 19, TypeScript, and modern browser media APIs. It combines dual-engine playback (YouTube IFrame API integration + HTML5 Hardware Video Decoding) with advanced playback controls: sub-second 5s seeking, on-screen dynamic volume HUD, press-and-hold 2X speed boost, theater mode, keyboard ergonomics, and drag-and-drop local file ingestion.
 
 ---
 
@@ -28,7 +28,7 @@ flowchart TD
         VMPlayer --> SettingsDialog[Settings Menu: Quality, Playback Rate, Stats for Nerds]
         
         ControlsBar --> Timeline[Scrubber Bar + Buffer Bar + Hover Time Tooltip]
-        ControlsBar --> PlaybackGroup[Play/Pause, Seek -10s, Seek +10s, Volume Slider]
+        ControlsBar --> PlaybackGroup[Play/Pause, Seek -5s, Seek +5s, Volume Slider]
         ControlsBar --> ActionGroup[Quality Badge, Theater Mode, PiP, Fullscreen]
     end
 
@@ -51,11 +51,11 @@ flowchart TD
   - Supports `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`, `.m4v`.
 
 ### 3.2 Playback Mechanics
-- **10-Second Seek Engine**:
-  - Dedicated `-10s` and `+10s` buttons on the control toolbar.
-  - Left double-click/double-tap decrements position by 10s with directional chevron ripple animation.
-  - Right double-click/double-tap increments position by 10s with directional chevron ripple animation.
-  - Keyboard mappings: `J` / `ArrowLeft` (-10s), `L` / `ArrowRight` (+10s).
+- **5-Second Seek Engine**:
+  - Dedicated `-5s` and `+5s` buttons on the control toolbar.
+  - Left double-click/double-tap decrements position by 5s with directional chevron ripple animation.
+  - Right double-click/double-tap increments position by 5s with directional chevron ripple animation.
+  - Keyboard mappings: `J` / `ArrowLeft` (-5s), `L` / `ArrowRight` (+5s).
 - **Play/Pause Engine**:
   - Spacebar or `K` key shortcut, bottom control button, and center video click.
   - Transient central SVG indicator scales and fades smoothly upon state changes.

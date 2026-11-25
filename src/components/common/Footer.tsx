@@ -108,9 +108,7 @@ export const Footer: React.FC = () => {
             >
               Copy Support Email
             </button>
-            <span className="text-[11px] text-slate-500 font-mono mt-1">
-              Ref: VM-ENGINE-2026-STABLE
-            </span>
+
           </div>
         </div>
       </div>
@@ -119,9 +117,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-6xl mx-auto border-t border-[#232A3B] mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-400 font-mono">
         <div>© 2026 VM Player. All rights reserved.</div>
         <div className="flex items-center gap-4">
-          <span>Engine v2.5</span>
-          <span>•</span>
-          <span>YouTube API + HTML5 MSE</span>
+          <span>Created by Vedanttt</span>
           <span>•</span>
           <span>Zero Telemetry Leaks</span>
         </div>
@@ -159,7 +155,7 @@ export const Footer: React.FC = () => {
                   over web streams (including YouTube) and local disk files.
                 </p>
                 <p>
-                  Features include sub-second 10-second seeking with animated chevrons, press-and-hold
+                  Features include sub-second 5-second seeking with animated chevrons, press-and-hold
                   2X speed boost, dynamic 4-state volume HUD, and hardware-accelerated local decoding.
                 </p>
                 <div className="p-3 bg-[#161B26] border border-[#232A3B] rounded">
@@ -181,7 +177,7 @@ export const Footer: React.FC = () => {
                 </p>
                 <div className="p-3 bg-[#161B26] border border-[#232A3B] rounded font-mono text-[11px] text-slate-300">
                   <p className="text-[#10B981] font-bold">// Engine Capabilities</p>
-                  <p>Seek Step: ±10.0 seconds with ripple HUD</p>
+                  <p>Seek Step: ±5.0 seconds with ripple HUD</p>
                   <p>Speed Ramping: 0.25x to 2.0x (Instant Hold for 2X)</p>
                   <p>Local Decoders: H.264, VP9, AV1, HEVC, AAC</p>
                   <p>Zero Upload: Local files decoded purely via Blob URL</p>

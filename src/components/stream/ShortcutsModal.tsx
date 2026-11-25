@@ -9,8 +9,8 @@ export const ShortcutsModal: React.FC = () => {
 
   const shortcuts = [
     { key: 'Space or K', action: 'Toggle Play / Pause', desc: 'Instant state toggle with central indicator' },
-    { key: 'J or Left Arrow', action: 'Seek Backward 10s', desc: 'Decrements timeline position by 10 seconds' },
-    { key: 'L or Right Arrow', action: 'Seek Forward 10s', desc: 'Increments timeline position by 10 seconds' },
+    { key: 'J or Left Arrow', action: 'Seek Backward 5s', desc: 'Decrements timeline position by 5 seconds' },
+    { key: 'L or Right Arrow', action: 'Seek Forward 5s', desc: 'Increments timeline position by 5 seconds' },
     { key: 'Long Press Screen', action: 'Hold for 2X Speed', desc: 'Accelerates playback to 2.0x while held' },
     { key: 'Up / Down Arrow', action: 'Volume Control (±5%)', desc: 'Triggers on-screen animated volume HUD' },
     { key: 'M', action: 'Toggle Mute', desc: 'Mutes or restores previous volume' },

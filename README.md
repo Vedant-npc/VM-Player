@@ -16,10 +16,10 @@ A precision standalone video player built with React 19, TypeScript, and modern 
    - Simply drag and drop any local video file (`.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`) from your File Explorer anywhere onto the browser window.
    - Decoded client-side with hardware acceleration via native browser blob pipelines with zero upload latency and zero server transfer.
 
-3. **Sub-Second 10-Second Seeking**:
-   - Control bar `-10s` and `+10s` buttons.
-   - Double-click or double-tap on the left 35% of the video viewport for `-10s` with animated chevron ripples; right 35% for `+10s`.
-   - Keyboard shortcuts: `J` or `ArrowLeft` (-10s), `L` or `ArrowRight` (+10s).
+3. **Sub-Second 5-Second Seeking**:
+   - Control bar `-5s` and `+5s` buttons.
+   - Double-click or double-tap on the left 35% of the video viewport for `-5s` with animated chevron ripples; right 35% for `+5s`.
+   - Keyboard shortcuts: `J` or `ArrowLeft` (-5s), `L` or `ArrowRight` (+5s).
 
 4. **Hold for 2X Speed Boost**:
    - Long-press / touch-hold anywhere on the video viewport for >250ms to instantly ramp playback to `2.0x`.
@@ -47,8 +47,8 @@ A precision standalone video player built with React 19, TypeScript, and modern 
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` or `K` | Toggle Play / Pause |
-| `J` or `ArrowLeft` | Seek backward 10 seconds |
-| `L` or `ArrowRight` | Seek forward 10 seconds |
+| `J` or `ArrowLeft` | Seek backward 5 seconds |
+| `L` or `ArrowRight` | Seek forward 5 seconds |
 | `Hold Pointer on Screen` | Hold for 2.0X Speed Boost |
 | `ArrowUp` | Volume Up (+5%) |
 | `ArrowDown` | Volume Down (-5%) |

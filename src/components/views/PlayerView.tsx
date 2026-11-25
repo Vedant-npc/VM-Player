@@ -214,7 +214,7 @@ export const PlayerView: React.FC = () => {
           VM Player
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-md">
-          Precision video player with 10s seeking, on-screen volume HUD, hold for 2X speed, and local hardware decoding.
+          Precision video player with 5s seeking, on-screen volume HUD, hold for 2X speed, and local hardware decoding.
         </p>
       </div>
 
