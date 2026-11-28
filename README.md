@@ -1,19 +1,52 @@
 # VM Player
 
-A precision standalone video player built with React 19, TypeScript, and modern browser media APIs. VM Player lets you paste any YouTube video link or simply drag and drop your local video files from File Explorer to play them instantly with studio-grade playback controls.
+A studio-grade standalone video player and media streaming web application built with React 19, TypeScript, and modern browser media APIs. VM Player provides dual-engine playback, combining instant YouTube streaming via link paste with native hardware-accelerated local video drag-and-drop playback.
 
 ![VM Player Favicon](public/favicon.svg)
 
 ---
 
-## Core Capabilities
+## 1. System Architecture & Component Hierarchy
+
+```mermaid
+flowchart TD
+    App[App Shell & Layout] --> Navbar[Top Navbar: Brand, PWA Install, Shortcuts]
+    App --> GlobalDropZone[Global Drag & Drop Overlay: File Explorer Hook]
+    App --> PlayerView[Main Player View]
+    App --> Footer[Footer: Status, Shortcuts, Support Email, 2026 Copyright]
+
+    PlayerView -->|No Video Active| Launcher[Central Intake: Paste URL Input + Drag/Drop File Zone + Recents]
+    PlayerView -->|Video Active| VMPlayer[VM Player Unified Engine]
+
+    subgraph "VM Player Engine Architecture"
+        VMPlayer --> DriverSwitch{Engine Driver Selector}
+        DriverSwitch -->|YouTube Link| YTDriver[YouTube IFrame API Engine]
+        DriverSwitch -->|Local Disk / Direct Stream| HTML5Driver[HTML5 Hardware Video Element]
+
+        VMPlayer --> GestureEngine[Gesture & Touch Controller: Long-press 2x, Double-tap Seek]
+        VMPlayer --> OverlayHUD[HUD Overlays: 2X Banner, Volume Meter, Seek Ripple, Buffer Spinner]
+        VMPlayer --> ControlsBar[Custom Controls Bar]
+        VMPlayer --> SettingsDialog[Settings Menu: Quality, Playback Rate, Stats for Nerds]
+        
+        ControlsBar --> Timeline[Scrubber Bar + Buffer Bar + Hover Time Tooltip]
+        ControlsBar --> PlaybackGroup[Play/Pause, Seek -5s, Seek +5s, Volume Slider]
+        ControlsBar --> ActionGroup[Quality Badge, Theater Mode, PiP, Fullscreen]
+    end
+
+    App --> StateStore[Player Context & Safe LocalStorage Persistence]
+    StateStore --> ToastManager[Toast Notification Engine]
+```
+
+---
+
+## 2. Core Capabilities
 
 1. **Paste & Play YouTube Videos**:
    - Paste any YouTube watch link, short link (`youtu.be/...`), embed, or YouTube Shorts URL directly into the player.
    - Automatically extracts and controls the stream via the YouTube Engine, giving you seamless control with all of VM Player's custom controls.
 
 2. **Drag & Drop Local Video Files**:
-   - Simply drag and drop any local video file (`.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`) from your File Explorer anywhere onto the browser window.
+   - Simply drag and drop any local video file (`.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`, `.m4v`) from your File Explorer anywhere onto the browser window.
    - Decoded client-side with hardware acceleration via native browser blob pipelines with zero upload latency and zero server transfer.
 
 3. **Sub-Second 5-Second Seeking**:
@@ -38,18 +71,33 @@ A precision standalone video player built with React 19, TypeScript, and modern 
 7. **Theater Mode, Fullscreen & Telemetry**:
    - Theater Mode (`T` key) expands the player to widescreen.
    - Fullscreen (`F` key) expands to full viewport.
-   - Stats for Nerds overlay tracking resolution, viewport dimensions, buffer health, and decoder pipeline.
+   - Stats for Nerds overlay tracking resolution, viewport dimensions, buffer health, dropped frames, and decoder pipeline.
 
 8. **Device Installation & Desktop File Handling (PWA)**:
    - Installable as a standalone desktop or mobile application directly onto your operating system via Chrome, Edge, Safari, or Brave.
-   - Integrates the Web App File Handling API (`file_handlers` for `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`), allowing your OS to open local movie files directly with VM Player.
+   - Integrates the Web App File Handling API (`file_handlers` for `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`, `.m4v`), allowing your OS to open local movie files directly with VM Player.
    - Offline service worker caching (`sw.js`) so your player launches instantly even without an internet connection.
 
 ---
 
-## Security & Hardening Architecture
+## 3. Dual-Engine Driver Architecture
 
-VM Player includes defense-in-depth security hardening against common client-side and web-based attack vectors:
+### 3.1 YouTube Playback Driver
+- Dynamically loads `https://www.youtube.com/iframe_api`.
+- Extracts YouTube ID from any standard watch URL, `youtu.be` shortlink, embed, or shorts link.
+- Controls playback rate, volume, play/pause, and seeking programmatically under a unified gesture layer.
+
+### 3.2 Local Media & Direct URL Driver
+- Uses native HTML5 `<video>` element with GPU hardware decoding.
+- Local files ingested via `URL.createObjectURL(file)` with zero server upload.
+- Active memory cleanup via `URL.revokeObjectURL()` on file changes and unmounts.
+- Supports `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`, `.m4v`, `.ogv`.
+
+---
+
+## 4. Security & Hardening Architecture
+
+VM Player includes defense-in-depth security hardening against client-side and web-based attack vectors:
 
 - **Strict Protocol Validation**: Video intake filters and strictly whitelists network protocols to `http:` and `https:`, blocking `javascript:`, `data:`, `file:`, or pseudo-protocol code injection attacks.
 - **Content Security Policy (CSP)**: Built-in `meta` CSP enforcing `default-src 'self'`, `object-src 'none'`, and constraining script, frame, media, and connect origins exclusively to local assets and official YouTube/Google endpoints.
@@ -60,7 +108,7 @@ VM Player includes defense-in-depth security hardening against common client-sid
 
 ---
 
-## Keyboard Shortcuts Reference
+## 5. Keyboard Shortcuts Reference
 
 | Shortcut | Action |
 | :--- | :--- |
@@ -78,7 +126,7 @@ VM Player includes defense-in-depth security hardening against common client-sid
 
 ---
 
-## Getting Started
+## 6. Getting Started
 
 ### Installation
 ```bash
@@ -100,7 +148,7 @@ npm run preview
 
 ---
 
-## License & Attribution
+## 7. License & Attribution
 
-VM Player is open-source under the MIT license.
+VM Player is open-source under the MIT license.  
 © 2026 VM Player. All rights reserved.
