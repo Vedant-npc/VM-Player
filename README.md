@@ -40,6 +40,24 @@ A precision standalone video player built with React 19, TypeScript, and modern 
    - Fullscreen (`F` key) expands to full viewport.
    - Stats for Nerds overlay tracking resolution, viewport dimensions, buffer health, and decoder pipeline.
 
+8. **Device Installation & Desktop File Handling (PWA)**:
+   - Installable as a standalone desktop or mobile application directly onto your operating system via Chrome, Edge, Safari, or Brave.
+   - Integrates the Web App File Handling API (`file_handlers` for `.mp4`, `.webm`, `.mkv`, `.mov`, `.avi`), allowing your OS to open local movie files directly with VM Player.
+   - Offline service worker caching (`sw.js`) so your player launches instantly even without an internet connection.
+
+---
+
+## Security & Hardening Architecture
+
+VM Player includes defense-in-depth security hardening against common client-side and web-based attack vectors:
+
+- **Strict Protocol Validation**: Video intake filters and strictly whitelists network protocols to `http:` and `https:`, blocking `javascript:`, `data:`, `file:`, or pseudo-protocol code injection attacks.
+- **Content Security Policy (CSP)**: Built-in `meta` CSP enforcing `default-src 'self'`, `object-src 'none'`, and constraining script, frame, media, and connect origins exclusively to local assets and official YouTube/Google endpoints.
+- **Memory Leak & DoS Prevention**: Local video playback uses an active blob URL registry that automatically revokes (`URL.revokeObjectURL`) memory allocations on every file switch, clear, and page unload, preventing memory exhaustion when opening massive 1080p/4K movie files.
+- **Input Sanitization**: Titles, filenames, and query parameters are stripped of control characters, angle brackets, and non-printable bytes to prevent DOM clobbering and XSS.
+- **Referrer Policy & MIME Sniffing Protection**: Enforces `strict-origin-when-cross-origin` and `X-Content-Type-Options: nosniff`.
+- **Zero Package Vulnerabilities**: Audited clean with zero security advisories.
+
 ---
 
 ## Keyboard Shortcuts Reference

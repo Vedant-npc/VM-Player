@@ -43,3 +43,34 @@ export interface PlayerStats {
   codec?: string;
   engine?: string;
 }
+
+// PWA and File Handling Types
+export interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
+export interface FileSystemFileHandle {
+  getFile(): Promise<File>;
+}
+
+export interface LaunchParams {
+  readonly targetURL?: string;
+  readonly files: FileSystemFileHandle[];
+}
+
+export interface LaunchQueue {
+  setConsumer(consumer: (launchParams: LaunchParams) => void | Promise<void>): void;
+}
+
+declare global {
+  interface Window {
+    launchQueue?: LaunchQueue;
+    beforeInstallPromptEvent?: BeforeInstallPromptEvent | null;
+  }
+}
+

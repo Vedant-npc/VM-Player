@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>VM Player - Studio Grade Video Streaming & Media Player</title>
+
+    <!-- Content Security Policy & Web Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: https://i.ytimg.com; media-src 'self' blob: data: https: http:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://noembed.com https://www.youtube.com; object-src 'none'; base-uri 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     
     <!-- Meta Descriptions and SEO -->
     <meta name="description" content="Studio-grade video player featuring precision 5s seeking, interactive volume HUD, hold-for-2X speed boost, YouTube integration, and local file drag-and-drop." />
@@ -20,8 +25,13 @@
     <meta property="twitter:title" content="VM Player - Studio Grade Video Streaming" />
     <meta property="twitter:description" content="High performance video streaming platform with sub-second controls and adaptive streaming." />
 
-    <!-- Favicon -->
+    <!-- Favicon & PWA Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VM Player" />
 
     <!-- Typography: Plus Jakarta Sans (Clean, modern humanist geometric) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
